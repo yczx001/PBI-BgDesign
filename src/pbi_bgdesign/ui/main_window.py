@@ -25,6 +25,7 @@ class MainWindow(QMainWindow):
         self.pbix_data: PbixData | None = None
         self.current_page_index: int = 0
         self.scene_builder: SceneBuilder | None = None
+        self._fullscreen = None
 
         self._setup_ui()
 
@@ -194,7 +195,31 @@ class MainWindow(QMainWindow):
             self.chat_display.append(f"已附加图片: {path}")
 
     def _toggle_fullscreen(self):
-        self.chat_display.append("全屏预览功能开发中...")
+        from pbi_bgdesign.ui.fullscreen import FullscreenPreview
+        if not self.pbix_data:
+            return
+        self._fullscreen = FullscreenPreview(
+            total_pages=len(self.pbix_data.pages),
+            current_page=self.current_page_index,
+        )
+        self._fullscreen.page_changed.connect(self._on_fullscreen_page_changed)
+        self._fullscreen.closed.connect(self._on_fullscreen_closed)
+        if self.scene_builder:
+            self._fullscreen.set_scene(self.scene_builder.build())
+        self._fullscreen.show()
+
+    def _on_fullscreen_page_changed(self, index: int):
+        self.current_page_index = index
+        self.page_list.blockSignals(True)
+        self.page_list.setCurrentRow(index)
+        self.page_list.blockSignals(False)
+        page = self.pbix_data.pages[index]
+        analysis = analyze_layout(page)
+        self.scene_builder = SceneBuilder(analysis)
+        self._fullscreen.set_scene(self.scene_builder.build())
+
+    def _on_fullscreen_closed(self):
+        self._fullscreen = None
 
     def _export_png(self):
         if not self.scene_builder or not self.pbix_data:
