@@ -5,7 +5,7 @@
 - Task 2: Layout Analyzer — COMPLETE (ba89b99..141f5fb, review APPROVED)
 - Task 3: Mock Chart Renderer — COMPLETE (141f5fb..5fc1633, review APPROVED)
 - Task 4: SVG Parser + Exporter — COMPLETE (5fc1633..76776a2, review APPROVED)
-- Task 5: Scene Renderer — PENDING
+- Task 5: Scene Renderer — COMPLETE (76776a2..3c9106f, review APPROVED)
 - Task 6: Skill Loader — PENDING
 - Task 7: AI Designer — PENDING
 - Task 8: MCP Client — PENDING
