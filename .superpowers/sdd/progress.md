@@ -1,7 +1,7 @@
 # PBI-BgDesign Implementation Progress
 
 ## Tasks
-- Task 1: Project Setup + PBIX Parser — PENDING
+- Task 1: Project Setup + PBIX Parser — COMPLETE (ba85f1b..ba89b99, review APPROVED)
 - Task 2: Layout Analyzer — PENDING
 - Task 3: Mock Chart Renderer — PENDING
 - Task 4: SVG Parser + Exporter — PENDING
