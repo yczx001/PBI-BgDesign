@@ -1,0 +1,171 @@
+76776a2 feat: add SVG parser and PNG/SVG exporter
+
+ src/pbi_bgdesign/exporter.py   | 29 +++++++++++++++++++++++++++++
+ src/pbi_bgdesign/svg_design.py | 38 ++++++++++++++++++++++++++++++++++++++
+ tests/test_exporter.py         | 38 ++++++++++++++++++++++++++++++++++++++
+ tests/test_svg_design.py       | 34 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 139 insertions(+)
+---FULL DIFF---
+diff --git a/src/pbi_bgdesign/exporter.py b/src/pbi_bgdesign/exporter.py
+new file mode 100644
+index 0000000..010e4ca
+--- /dev/null
++++ b/src/pbi_bgdesign/exporter.py
+@@ -0,0 +1,29 @@
++"""Export QGraphicsScene to PNG or SVG files."""
++from PyQt6.QtWidgets import QGraphicsScene
++from PyQt6.QtCore import QSize, QRectF
++from PyQt6.QtGui import QImage, QPainter
++from PyQt6.QtSvg import QSvgGenerator
++
++
++def export_png(scene: QGraphicsScene, path: str, size: QSize):
++    """Export scene to PNG file at the given size."""
++    image = QImage(size, QImage.Format.Format_ARGB32)
++    image.fill(scene.backgroundBrush().color())
++    painter = QPainter(image)
++    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
++    scene.render(painter, QRectF(0, 0, size.width(), size.height()))
++    painter.end()
++    image.save(path, "PNG")
++
++
++def export_svg(scene: QGraphicsScene, path: str, size: QSize):
++    """Export scene to SVG file at the given size."""
++    generator = QSvgGenerator()
++    generator.setFileName(path)
++    generator.setSize(size)
++    generator.setViewBox(QRectF(0, 0, size.width(), size.height()))
++    generator.setTitle("PBI-BgDesign Export")
++    painter = QPainter(generator)
++    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
++    scene.render(painter, QRectF(0, 0, size.width(), size.height()))
++    painter.end()
+diff --git a/src/pbi_bgdesign/svg_design.py b/src/pbi_bgdesign/svg_design.py
+new file mode 100644
+index 0000000..6690da9
+--- /dev/null
++++ b/src/pbi_bgdesign/svg_design.py
+@@ -0,0 +1,38 @@
++"""Parse SVG code into QGraphicsItems for scene rendering."""
++import re
++from PyQt6.QtSvg import QSvgRenderer
++from PyQt6.QtSvgWidgets import QGraphicsSvgItem
++from PyQt6.QtCore import QByteArray
++
++
++def extract_svg_from_text(text: str) -> str | None:
++    """Extract SVG code from AI response text.
++
++    Looks for ```svg or ```xml code blocks first, then falls back to
++    finding raw <svg>...</svg> tags.
++    """
++    # Try markdown code block
++    pattern = r'```(?:svg|xml)\s*\n(.*?)```'
++    match = re.search(pattern, text, re.DOTALL)
++    if match:
++        return match.group(1).strip()
++
++    # Try raw <svg> tag
++    pattern = r'(<svg[^>]*>.*?</svg>)'
++    match = re.search(pattern, text, re.DOTALL)
++    if match:
++        return match.group(1).strip()
++
++    return None
++
++
++def parse_svg_to_items(svg_code: str) -> list[QGraphicsSvgItem]:
++    """Parse SVG code string into QGraphicsSvgItem list."""
++    data = QByteArray(svg_code.encode("utf-8"))
++    renderer = QSvgRenderer(data)
++    if not renderer.isValid():
++        return []
++
++    item = QGraphicsSvgItem()
++    item.setSharedRenderer(renderer)
++    return [item]
+diff --git a/tests/test_exporter.py b/tests/test_exporter.py
+new file mode 100644
+index 0000000..e52aa43
+--- /dev/null
++++ b/tests/test_exporter.py
+@@ -0,0 +1,38 @@
++import pytest
++import tempfile
++from pathlib import Path
++
++from PyQt6.QtWidgets import QApplication, QGraphicsScene, QGraphicsRectItem
++from PyQt6.QtCore import QSize, QRectF
++from PyQt6.QtGui import QColor
++
++from pbi_bgdesign.exporter import export_png, export_svg
++
++app = QApplication.instance() or QApplication([])
++
++
++@pytest.fixture
++def sample_scene():
++    scene = QGraphicsScene()
++    scene.setSceneRect(0, 0, 1280, 720)
++    scene.setBackgroundBrush(QColor("white"))
++    # Add a rectangle
++    item = QGraphicsRectItem(QRectF(100, 100, 300, 200))
++    item.setBrush(QColor("#01B8AA"))
++    scene.addItem(item)
++    return scene
++
++
++def test_export_png_creates_file(sample_scene, tmp_path):
++    output = tmp_path / "test.png"
++    export_png(sample_scene, str(output), QSize(1280, 720))
++    assert output.exists()
++    assert output.stat().st_size > 0
++
++
++def test_export_svg_creates_file(sample_scene, tmp_path):
++    output = tmp_path / "test.svg"
++    export_svg(sample_scene, str(output), QSize(1280, 720))
++    assert output.exists()
++    content = output.read_text(encoding="utf-8")
++    assert "<svg" in content
+diff --git a/tests/test_svg_design.py b/tests/test_svg_design.py
+new file mode 100644
+index 0000000..233d66e
+--- /dev/null
++++ b/tests/test_svg_design.py
+@@ -0,0 +1,34 @@
++import pytest
++from PyQt6.QtWidgets import QApplication
++from pbi_bgdesign.svg_design import parse_svg_to_items, extract_svg_from_text
++
++# Need QApplication for QGraphicsItem
++app = QApplication.instance() or QApplication([])
++
++
++def test_extract_svg_from_markdown_code_block():
++    text = 'Here is the design:\n```svg\n<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="red"/></svg>\n```\nDone.'
++    result = extract_svg_from_text(text)
++    assert result is not None
++    assert "<svg" in result
++    assert "rect" in result
++
++
++def test_extract_svg_from_plain_text():
++    text = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><circle cx="100" cy="100" r="50"/></svg>'
++    result = extract_svg_from_text(text)
++    assert result is not None
++    assert "circle" in result
++
++
++def test_extract_svg_returns_none_for_no_svg():
++    text = "No SVG here, just text."
++    result = extract_svg_from_text(text)
++    assert result is None
++
++
++def test_parse_svg_to_items_returns_list():
++    svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect x="10" y="10" width="80" height="80" fill="blue"/></svg>'
++    items = parse_svg_to_items(svg)
++    assert isinstance(items, list)
++    assert len(items) > 0
