@@ -9,7 +9,7 @@
 - Task 6: Skill Loader — COMPLETE (3c9106f..6583987, review APPROVED)
 - Task 7: AI Designer — COMPLETE (6583987..4886c7b, review APPROVED)
 - Task 8: MCP Client — COMPLETE (4886c7b..4d8ebcd, review APPROVED)
-- Task 9: Main Window + Canvas + Page List — PENDING
-- Task 10: Fullscreen Preview — PENDING
-- Task 11: Power BI External Tool Registration — PENDING
+- Task 9: Main Window + Canvas + Page List — COMPLETE (4d8ebcd..4df81e0, review APPROVED)
+- Task 10: Fullscreen Preview — COMPLETE (4df81e0..971fe68, review APPROVED after fix)
+- Task 11: Power BI External Tool Registration — COMPLETE (971fe68..4eff40e, verified)
 - Task 12: Integration + Cleanup — PENDING

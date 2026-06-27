@@ -4,4 +4,7 @@ __pycache__/
 dist/
 build/
 .pytest_cache/
+.eggs/
+*.egg
+.env
 .temp_claude/
