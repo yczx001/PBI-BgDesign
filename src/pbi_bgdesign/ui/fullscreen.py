@@ -29,6 +29,9 @@ class FullscreenPreview(QWidget):
         self.canvas = CanvasWidget()
         layout.addWidget(self.canvas, stretch=1)
 
+        # Enable mouse tracking so mouseMoveEvent fires without button press
+        self.setMouseTracking(True)
+
         # Bottom control bar (auto-hide)
         self.control_bar = QWidget()
         self.control_bar.setStyleSheet("background: rgba(0,0,0,150);")
