@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.eggs/
+*.egg
+.env
+.temp_claude/
+.superpowers/

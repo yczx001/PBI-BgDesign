@@ -1,0 +1,283 @@
+"""Generate mock chart visuals for preview."""
+import hashlib
+from PyQt6.QtGui import QImage, QPainter, QColor, QPen, QBrush, QFont
+from PyQt6.QtCore import Qt, QRectF, QPointF
+
+from pbi_bgdesign.models import VisualObject
+
+MOCK_COLORS = [
+    "#01B8AA", "#374649", "#FD6252", "#F2C80F",
+    "#5F6B6D", "#8AD4EB", "#FE9666", "#A66999",
+]
+
+
+def _deterministic_random(seed_str: str, count: int) -> list[float]:
+    """Generate deterministic pseudo-random floats [0,1) from a seed string."""
+    values = []
+    for i in range(count):
+        h = hashlib.md5(f"{seed_str}_{i}".encode()).hexdigest()
+        values.append(int(h[:8], 16) / 0xFFFFFFFF)
+    return values
+
+
+def _extract_structure(config: dict) -> dict:
+    """Extract structure info from visual config (category count, measure count)."""
+    structure = {"categories": 3, "measures": 1}
+    try:
+        select = config.get("singleVisual", {}).get("prototypeQuery", {}).get("Select", [])
+        cats = sum(1 for s in select if "Column" in s)
+        measures = sum(1 for s in select if "Measure" in s)
+        if cats > 0:
+            structure["categories"] = min(cats, 10)
+        if measures > 0:
+            structure["measures"] = min(measures, 5)
+    except (KeyError, TypeError):
+        pass
+    return structure
+
+
+def _color(index: int) -> QColor:
+    return QColor(MOCK_COLORS[index % len(MOCK_COLORS)])
+
+
+def _draw_donut(painter: QPainter, rect: QRectF, seed: str, structure: dict):
+    n = min(structure["categories"], 5)
+    values = _deterministic_random(seed, n)
+    total = sum(values) or 1
+    start_angle = 0
+    cx, cy = rect.center().x(), rect.center().y()
+    radius = min(rect.width(), rect.height()) * 0.4
+    inner_radius = radius * 0.55
+
+    for i in range(n):
+        span = int(5760 * values[i] / total)  # 5760 = 360*16
+        painter.setBrush(QBrush(_color(i)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawPie(
+            QRectF(cx - radius, cy - radius, radius * 2, radius * 2),
+            start_angle, span
+        )
+        start_angle += span
+
+    # White center (donut hole)
+    painter.setBrush(QBrush(QColor("white")))
+    painter.drawEllipse(QPointF(cx, cy), inner_radius, inner_radius)
+
+
+def _draw_pie(painter: QPainter, rect: QRectF, seed: str, structure: dict):
+    n = min(structure["categories"], 5)
+    values = _deterministic_random(seed, n)
+    total = sum(values) or 1
+    start_angle = 0
+    cx, cy = rect.center().x(), rect.center().y()
+    radius = min(rect.width(), rect.height()) * 0.4
+
+    for i in range(n):
+        span = int(5760 * values[i] / total)
+        painter.setBrush(QBrush(_color(i)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawPie(
+            QRectF(cx - radius, cy - radius, radius * 2, radius * 2),
+            start_angle, span
+        )
+        start_angle += span
+
+
+def _draw_line(painter: QPainter, rect: QRectF, seed: str, structure: dict):
+    margin = 30
+    chart_rect = rect.adjusted(margin, margin, -margin, -margin)
+
+    # Axes
+    painter.setPen(QPen(QColor("#CCCCCC"), 1))
+    painter.drawLine(int(chart_rect.left()), int(chart_rect.bottom()),
+                     int(chart_rect.right()), int(chart_rect.bottom()))
+    painter.drawLine(int(chart_rect.left()), int(chart_rect.top()),
+                     int(chart_rect.left()), int(chart_rect.bottom()))
+
+    # Lines
+    n_measures = structure["measures"]
+    n_points = 12
+    for m in range(n_measures):
+        values = _deterministic_random(f"{seed}_line{m}", n_points)
+        painter.setPen(QPen(_color(m), 2))
+        prev = None
+        for i in range(n_points):
+            x = chart_rect.left() + (chart_rect.width() * i / (n_points - 1))
+            y = chart_rect.bottom() - (chart_rect.height() * values[i])
+            if prev:
+                painter.drawLine(int(prev.x()), int(prev.y()), int(x), int(y))
+            prev = QPointF(x, y)
+
+
+def _draw_bar(painter: QPainter, rect: QRectF, seed: str, structure: dict):
+    margin = 30
+    chart_rect = rect.adjusted(margin, margin, -margin, -margin)
+    n_groups = 4
+    bar_h = chart_rect.height() / n_groups * 0.7
+
+    for g in range(n_groups):
+        values = _deterministic_random(f"{seed}_bar{g}", structure["measures"])
+        y = chart_rect.top() + chart_rect.height() * g / n_groups
+        x_offset = 0
+        for m, v in enumerate(values):
+            w = chart_rect.width() * v * 0.8
+            painter.setBrush(QBrush(_color(m)))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRect(QRectF(chart_rect.left() + x_offset, y, w, bar_h))
+            x_offset += w
+
+
+def _draw_table(painter: QPainter, rect: QRectF, seed: str, structure: dict):
+    cols = max(3, structure["measures"] + structure["categories"])
+    rows = 5
+    header_h = 30
+    row_h = (rect.height() - header_h) / rows
+    col_w = rect.width() / cols
+
+    # Header
+    painter.setBrush(QBrush(QColor("#374649")))
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.drawRect(QRectF(rect.x(), rect.y(), rect.width(), header_h))
+
+    # Header text
+    painter.setPen(QPen(QColor("white")))
+    painter.setFont(QFont("Segoe UI", 9))
+    for c in range(cols):
+        painter.drawText(
+            QRectF(rect.x() + c * col_w + 5, rect.y(), col_w - 10, header_h),
+            Qt.AlignmentFlag.AlignVCenter, f"Column {c + 1}"
+        )
+
+    # Grid lines
+    painter.setPen(QPen(QColor("#E0E0E0"), 1))
+    for r in range(1, rows + 1):
+        y = rect.y() + header_h + r * row_h
+        painter.drawLine(int(rect.x()), int(y), int(rect.right()), int(y))
+    for c in range(1, cols):
+        x = rect.x() + c * col_w
+        painter.drawLine(int(x), int(rect.y() + header_h), int(x), int(rect.bottom()))
+
+
+def _draw_card(painter: QPainter, rect: QRectF, seed: str, structure: dict):
+    # Background
+    painter.setBrush(QBrush(QColor("#F5F5F5")))
+    painter.setPen(QPen(QColor("#E0E0E0"), 1))
+    painter.drawRoundedRect(rect.adjusted(2, 2, -2, -2), 4, 4)
+
+    # Big number
+    values = _deterministic_random(seed, 1)
+    number = f"{int(values[0] * 9999):,}"
+    painter.setPen(QPen(QColor("#374649")))
+    painter.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
+    painter.drawText(rect.adjusted(10, 20, -10, -40), Qt.AlignmentFlag.AlignCenter, number)
+
+    # Label
+    painter.setFont(QFont("Segoe UI", 9))
+    painter.setPen(QPen(QColor("#888888")))
+    painter.drawText(rect.adjusted(10, rect.height() - 30, -10, -5),
+                     Qt.AlignmentFlag.AlignCenter, "Metric")
+
+
+def _draw_gantt(painter: QPainter, rect: QRectF, seed: str, structure: dict):
+    margin = 20
+    chart_rect = rect.adjusted(margin, margin, -margin, -margin)
+    bars = _deterministic_random(seed, 8)
+    bar_h = chart_rect.height() / 10
+
+    # Timeline header
+    painter.setBrush(QBrush(QColor("#F0F0F0")))
+    painter.drawRect(QRectF(chart_rect.x(), chart_rect.y(), chart_rect.width(), 20))
+
+    for i in range(8):
+        start = bars[i] * 0.3
+        length = bars[i] * 0.5 + 0.2
+        y = chart_rect.y() + 25 + i * (bar_h + 3)
+        x = chart_rect.x() + chart_rect.width() * start
+        w = chart_rect.width() * length
+        painter.setBrush(QBrush(_color(i)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(QRectF(x, y, w, bar_h), 2, 2)
+
+
+def _draw_slicer(painter: QPainter, rect: QRectF, seed: str, structure: dict):
+    # Rounded tag shapes
+    n = 3
+    tags = ["Filter A", "Filter B", "Filter C"]
+    y = rect.y() + 5
+    for i in range(n):
+        painter.setBrush(QBrush(QColor("#E8E8E8")))
+        painter.setPen(QPen(QColor("#CCCCCC"), 1))
+        tag_rect = QRectF(rect.x() + 5, y, rect.width() - 10, 22)
+        painter.drawRoundedRect(tag_rect, 4, 4)
+        painter.setPen(QPen(QColor("#666666")))
+        painter.setFont(QFont("Segoe UI", 8))
+        painter.drawText(tag_rect, Qt.AlignmentFlag.AlignCenter, tags[i])
+        y += 27
+
+
+def _draw_placeholder(painter: QPainter, rect: QRectF, label: str):
+    painter.setBrush(QBrush(QColor("#F0F0F0")))
+    painter.setPen(QPen(QColor("#CCCCCC"), 1, Qt.PenStyle.DashLine))
+    painter.drawRect(rect)
+    painter.setPen(QPen(QColor("#999999")))
+    painter.setFont(QFont("Segoe UI", 10))
+    painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, label)
+
+
+# Chart type -> render function mapping
+_CHART_RENDERERS = {
+    "donutChart": _draw_donut,
+    "pieChart": _draw_pie,
+    "lineChart": _draw_line,
+    "hundredPercentStackedBarChart": _draw_bar,
+    "hundredPercentStackedColumnChart": _draw_bar,
+    "barChart": _draw_bar,
+    "columnChart": _draw_bar,
+    "tableEx": _draw_table,
+    "pivotTable": _draw_table,
+    "cardVisual": _draw_card,
+    "multiRowCard": _draw_card,
+    "slicer": _draw_slicer,
+    "advancedSlicerVisual": _draw_slicer,
+}
+
+# Prefix match for custom visuals
+_PREFIX_RENDERERS = {
+    "Gantt": _draw_gantt,
+    "powerGANTT": _draw_gantt,
+    "htmlContent": lambda p, r, s, st: _draw_placeholder(p, r, "HTML Content"),
+    "synopticPanel": lambda p, r, s, st: _draw_placeholder(p, r, "Map Panel"),
+}
+
+
+def render_mock_chart(visual: VisualObject, image: QImage):
+    """Render a mock chart visual onto the given QImage.
+
+    The image should be pre-sized to match the visual's dimensions.
+    """
+    painter = QPainter(image)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+    rect = QRectF(0, 0, image.width(), image.height())
+    seed = f"{visual.id}_{visual.visual_type}"
+    structure = _extract_structure(visual.config)
+
+    vtype = visual.visual_type
+
+    # Try exact match
+    renderer = _CHART_RENDERERS.get(vtype)
+
+    # Try prefix match
+    if renderer is None:
+        for prefix, fn in _PREFIX_RENDERERS.items():
+            if vtype.startswith(prefix):
+                renderer = fn
+                break
+
+    # Fallback: placeholder
+    if renderer is None:
+        _draw_placeholder(painter, rect, f"[{vtype}]")
+    else:
+        renderer(painter, rect, seed, structure)
+
+    painter.end()

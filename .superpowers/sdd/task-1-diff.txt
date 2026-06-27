@@ -1,0 +1,499 @@
+ba89b99 feat: add PBIX parser with UTF-16-LE layout decoding and resource extraction
+ .gitignore                             |   7 ++
+ .superpowers/sdd/extract_task.py       |  18 ++++
+ .superpowers/sdd/progress.md           |  15 ++++
+ pyproject.toml                         |  28 ++++++
+ src/pbi_bgdesign/__init__.py           |   0
+ src/pbi_bgdesign/ai/__init__.py        |   0
+ src/pbi_bgdesign/core/__init__.py      |   0
+ src/pbi_bgdesign/export/__init__.py    |   0
+ src/pbi_bgdesign/models.py             |  43 +++++++++
+ src/pbi_bgdesign/pbix_parser.py        | 154 +++++++++++++++++++++++++++++++++
+ src/pbi_bgdesign/rendering/__init__.py |   0
+ src/pbi_bgdesign/ui/__init__.py        |   0
+ tests/__init__.py                      |   0
+ tests/test_pbix_parser.py              | 154 +++++++++++++++++++++++++++++++++
+ 14 files changed, 419 insertions(+)
+---FULL DIFF---
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..3ea8582
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,7 @@
++__pycache__/
++*.py[cod]
++*.egg-info/
++dist/
++build/
++.pytest_cache/
++.temp_claude/
+diff --git a/.superpowers/sdd/extract_task.py b/.superpowers/sdd/extract_task.py
+new file mode 100644
+index 0000000..5aabac9
+--- /dev/null
++++ b/.superpowers/sdd/extract_task.py
+@@ -0,0 +1,18 @@
++"""Extract a task from the plan file."""
++import sys
++import re
++
++plan_path = sys.argv[1]
++task_num = int(sys.argv[2])
++
++with open(plan_path, "r", encoding="utf-8") as f:
++    content = f.read()
++
++# Split by task headers
++tasks = re.split(r'(?=### Task \d+:)', content)
++for t in tasks:
++    match = re.match(r'### Task (\d+):', t)
++    if match and int(match.group(1)) == task_num:
++        # Find end (next task or end)
++        print(t.strip())
++        break
+diff --git a/.superpowers/sdd/progress.md b/.superpowers/sdd/progress.md
+new file mode 100644
+index 0000000..63e18dc
+--- /dev/null
++++ b/.superpowers/sdd/progress.md
+@@ -0,0 +1,15 @@
++# PBI-BgDesign Implementation Progress
++
++## Tasks
++- Task 1: Project Setup + PBIX Parser — PENDING
++- Task 2: Layout Analyzer — PENDING
++- Task 3: Mock Chart Renderer — PENDING
++- Task 4: SVG Parser + Exporter — PENDING
++- Task 5: Scene Renderer — PENDING
++- Task 6: Skill Loader — PENDING
++- Task 7: AI Designer — PENDING
++- Task 8: MCP Client — PENDING
++- Task 9: Main Window + Canvas + Page List — PENDING
++- Task 10: Fullscreen Preview — PENDING
++- Task 11: Power BI External Tool Registration — PENDING
++- Task 12: Integration + Cleanup — PENDING
+diff --git a/pyproject.toml b/pyproject.toml
+new file mode 100644
+index 0000000..005fc36
+--- /dev/null
++++ b/pyproject.toml
+@@ -0,0 +1,28 @@
++[build-system]
++requires = ["setuptools>=68.0", "wheel"]
++build-backend = "setuptools.build_meta"
++
++[project]
++name = "pbi-bgdesign"
++version = "0.1.0"
++description = "Power BI Background Designer"
++requires-python = ">=3.11"
++dependencies = [
++    "PyQt6>=6.6",
++    "anthropic>=0.40",
++    "mcp>=1.0",
++    "watchdog>=3.0",
++]
++
++[project.optional-dependencies]
++dev = ["pytest>=7.0", "pytest-qt>=4.0"]
++
++[project.scripts]
++pbi-bgdesign = "pbi_bgdesign.app:main"
++
++[tool.setuptools.packages.find]
++where = ["src"]
++
++[tool.pytest.ini_options]
++testpaths = ["tests"]
++pythonpath = ["src"]
+diff --git a/src/pbi_bgdesign/__init__.py b/src/pbi_bgdesign/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/src/pbi_bgdesign/ai/__init__.py b/src/pbi_bgdesign/ai/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/src/pbi_bgdesign/core/__init__.py b/src/pbi_bgdesign/core/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/src/pbi_bgdesign/export/__init__.py b/src/pbi_bgdesign/export/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/src/pbi_bgdesign/models.py b/src/pbi_bgdesign/models.py
+new file mode 100644
+index 0000000..507591c
+--- /dev/null
++++ b/src/pbi_bgdesign/models.py
+@@ -0,0 +1,43 @@
++from dataclasses import dataclass, field
++
++
++@dataclass
++class VisualObject:
++    """A single visual object extracted from a .pbix layout."""
++    id: str
++    visual_type: str  # "shape", "image", "textbox", "donutChart", etc.
++    x: float
++    y: float
++    z: int
++    width: float
++    height: float
++    title: str | None = None
++    config: dict = field(default_factory=dict)
++    resource_path: str | None = None
++
++    @property
++    def bbox(self) -> tuple[float, float, float, float]:
++        return (self.x, self.y, self.width, self.height)
++
++    @property
++    def area(self) -> float:
++        return self.width * self.height
++
++
++@dataclass
++class PageData:
++    """A single report page with its visual objects."""
++    name: str
++    display_name: str
++    width: float
++    height: float
++    visuals: list[VisualObject] = field(default_factory=list)
++
++
++@dataclass
++class PbixData:
++    """Complete parsed .pbix data."""
++    pages: list[PageData] = field(default_factory=list)
++    resources: dict[str, bytes] = field(default_factory=dict)
++    theme: dict | None = None
++    source_path: str = ""
+diff --git a/src/pbi_bgdesign/pbix_parser.py b/src/pbi_bgdesign/pbix_parser.py
+new file mode 100644
+index 0000000..4add029
+--- /dev/null
++++ b/src/pbi_bgdesign/pbix_parser.py
+@@ -0,0 +1,154 @@
++"""Parser for .pbix files (Power BI reports)."""
++import json
++import zipfile
++from pathlib import Path
++
++from pbi_bgdesign.models import PbixData, PageData, VisualObject
++
++
++def _decode_layout(raw: bytes) -> dict:
++    """Decode Layout JSON from UTF-16-LE bytes."""
++    text = raw.decode("utf-16-le")
++    return json.loads(text)
++
++
++def _extract_title(config: dict) -> str | None:
++    """Extract chart title from visual config objects."""
++    try:
++        objects = config.get("singleVisual", {}).get("objects", {})
++        title_list = objects.get("title", [])
++        if title_list:
++            props = title_list[0].get("properties", {})
++            text_expr = props.get("text", {}).get("expr", {})
++            literal = text_expr.get("Literal", {})
++            value = literal.get("Value", "")
++            # Remove surrounding quotes
++            return value.strip("'\"") if value else None
++    except (KeyError, IndexError, TypeError):
++        pass
++    return None
++
++
++def _extract_resource_path(config: dict) -> str | None:
++    """Extract image resource path from visual config."""
++    try:
++        objects = config.get("singleVisual", {}).get("objects", {})
++        general = objects.get("general", [])
++        if general:
++            props = general[0].get("properties", {})
++            image_url = props.get("imageUrl", {}).get("expr", {})
++            rpi = image_url.get("ResourcePackageItem", {})
++            return rpi.get("ItemName")
++    except (KeyError, IndexError, TypeError):
++        pass
++    return None
++
++
++def _parse_visual(vc: dict, index: int) -> VisualObject:
++    """Parse a single visualContainer dict into a VisualObject."""
++    config_str = vc.get("config", "{}")
++    try:
++        config = json.loads(config_str)
++    except json.JSONDecodeError:
++        config = {}
++
++    visual_type = config.get("singleVisual", {}).get("visualType", "unknown")
++    title = _extract_title(config)
++    resource_path = _extract_resource_path(config)
++
++    # Generate a stable ID from config name or fallback to index
++    obj_name = config.get("name", f"visual_{index}")
++
++    return VisualObject(
++        id=obj_name,
++        visual_type=visual_type,
++        x=float(vc.get("x", 0)),
++        y=float(vc.get("y", 0)),
++        z=int(vc.get("z", 0)),
++        width=float(vc.get("width", 0)),
++        height=float(vc.get("height", 0)),
++        title=title,
++        config=config,
++        resource_path=resource_path,
++    )
++
++
++def _parse_page(section: dict) -> PageData:
++    """Parse a section dict into a PageData."""
++    visuals = []
++    for i, vc in enumerate(section.get("visualContainers", [])):
++        visuals.append(_parse_visual(vc, i))
++
++    return PageData(
++        name=section.get("name", ""),
++        display_name=section.get("displayName", ""),
++        width=float(section.get("width", 1280)),
++        height=float(section.get("height", 720)),
++        visuals=visuals,
++    )
++
++
++def _extract_resources(zf: zipfile.ZipFile) -> dict[str, bytes]:
++    """Extract static resources from the ZIP."""
++    resources = {}
++    prefix = "Report/StaticResources/RegisteredResources/"
++    for entry in zf.namelist():
++        if entry.startswith(prefix):
++            filename = entry[len(prefix):]
++            if filename:  # skip directory entries
++                resources[filename] = zf.read(entry)
++    return resources
++
++
++def _extract_theme(zf: zipfile.ZipFile) -> dict | None:
++    """Extract theme JSON if present."""
++    prefix = "Report/StaticResources/SharedResources/BaseThemes/"
++    for entry in zf.namelist():
++        if entry.startswith(prefix) and entry.endswith(".json"):
++            try:
++                return json.loads(zf.read(entry))
++            except json.JSONDecodeError:
++                return None
++    return None
++
++
++def parse_pbix(path: str) -> PbixData:
++    """Parse a .pbix file and return structured data.
++
++    Args:
++        path: Path to the .pbix file.
++
++    Returns:
++        PbixData with pages, resources, and theme.
++
++    Raises:
++        Exception: If the file is not a valid .pbix (ZIP) file.
++    """
++    try:
++        with zipfile.ZipFile(path, "r") as zf:
++            # Parse Layout
++            if "Report/Layout" not in zf.namelist():
++                raise ValueError("not a valid .pbix file: missing Report/Layout")
++
++            layout_raw = zf.read("Report/Layout")
++            layout = _decode_layout(layout_raw)
++
++            # Parse pages
++            pages = []
++            for section in layout.get("sections", []):
++                pages.append(_parse_page(section))
++
++            # Extract resources
++            resources = _extract_resources(zf)
++
++            # Extract theme
++            theme = _extract_theme(zf)
++
++            return PbixData(
++                pages=pages,
++                resources=resources,
++                theme=theme,
++                source_path=path,
++            )
++    except zipfile.BadZipFile:
++        raise ValueError(f"not a valid .pbix file: {path}")
+diff --git a/src/pbi_bgdesign/rendering/__init__.py b/src/pbi_bgdesign/rendering/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/src/pbi_bgdesign/ui/__init__.py b/src/pbi_bgdesign/ui/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/tests/__init__.py b/tests/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/tests/test_pbix_parser.py b/tests/test_pbix_parser.py
+new file mode 100644
+index 0000000..82849c3
+--- /dev/null
++++ b/tests/test_pbix_parser.py
+@@ -0,0 +1,154 @@
++import json
++import zipfile
++import io
++from pathlib import Path
++
++import pytest
++
++from pbi_bgdesign.pbix_parser import parse_pbix
++from pbi_bgdesign.models import PbixData, PageData, VisualObject
++
++
++@pytest.fixture
++def sample_pbix_path(tmp_path: Path) -> Path:
++    """Create a minimal .pbix file for testing."""
++    layout = {
++        "sections": [
++            {
++                "name": "page1_id",
++                "displayName": "Home",
++                "width": 1280,
++                "height": 720,
++                "displayOption": 1,
++                "visualContainers": [
++                    {
++                        "x": 100.0,
++                        "y": 50.0,
++                        "z": 1000,
++                        "width": 300.0,
++                        "height": 200.0,
++                        "config": json.dumps({
++                            "name": "visual1",
++                            "singleVisual": {
++                                "visualType": "donutChart",
++                                "objects": {
++                                    "title": [{"properties": {"text": {"expr": {"Literal": {"Value": "'Sales Distribution'"}}}}}]
++                                }
++                            }
++                        })
++                    },
++                    {
++                        "x": 0.0,
++                        "y": 0.0,
++                        "z": 500,
++                        "width": 1280.0,
++                        "height": 60.0,
++                        "config": json.dumps({
++                            "name": "visual2",
++                            "singleVisual": {
++                                "visualType": "shape",
++                                "objects": {}
++                            }
++                        })
++                    },
++                    {
++                        "x": 1075.0,
++                        "y": 7.0,
++                        "z": 2000,
++                        "width": 177.0,
++                        "height": 46.0,
++                        "config": json.dumps({
++                            "name": "visual3",
++                            "singleVisual": {
++                                "visualType": "image",
++                                "objects": {
++                                    "general": [{"properties": {
++                                        "imageUrl": {"expr": {"ResourcePackageItem": {
++                                            "PackageName": "RegisteredResources",
++                                            "ItemName": "logo.png"
++                                        }}}
++                                    }}]
++                                }
++                            }
++                        })
++                    }
++                ]
++            },
++            {
++                "name": "page2_id",
++                "displayName": "Detail",
++                "width": 1920,
++                "height": 1080,
++                "displayOption": 1,
++                "visualContainers": []
++            }
++        ]
++    }
++
++    pbix_path = tmp_path / "test.pbix"
++    with zipfile.ZipFile(pbix_path, "w") as zf:
++        # Layout is UTF-16-LE encoded
++        layout_json = json.dumps(layout, ensure_ascii=False)
++        layout_bytes = layout_json.encode("utf-16-le")
++        zf.writestr("Report/Layout", layout_bytes)
++        # Add a resource file
++        zf.writestr("Report/StaticResources/RegisteredResources/logo.png", b"\x89PNG_FAKE_DATA")
++        # Add theme
++        zf.writestr("Report/StaticResources/SharedResources/BaseThemes/theme.json",
++                     json.dumps({"name": "CustomTheme"}))
++    return pbix_path
++
++
++def test_parse_pbix_returns_pbix_data(sample_pbix_path: Path):
++    result = parse_pbix(str(sample_pbix_path))
++    assert isinstance(result, PbixData)
++    assert result.source_path == str(sample_pbix_path)
++
++
++def test_parse_pbix_extracts_pages(sample_pbix_path: Path):
++    result = parse_pbix(str(sample_pbix_path))
++    assert len(result.pages) == 2
++    assert result.pages[0].display_name == "Home"
++    assert result.pages[0].width == 1280
++    assert result.pages[0].height == 720
++    assert result.pages[1].display_name == "Detail"
++    assert result.pages[1].width == 1920
++
++
++def test_parse_pbix_extracts_visuals(sample_pbix_path: Path):
++    result = parse_pbix(str(sample_pbix_path))
++    page = result.pages[0]
++    assert len(page.visuals) == 3
++
++    donut = page.visuals[0]
++    assert donut.visual_type == "donutChart"
++    assert donut.x == 100.0
++    assert donut.y == 50.0
++    assert donut.width == 300.0
++    assert donut.title == "Sales Distribution"
++
++    shape = page.visuals[1]
++    assert shape.visual_type == "shape"
++
++    image = page.visuals[2]
++    assert image.visual_type == "image"
++    assert image.resource_path == "logo.png"
++
++
++def test_parse_pbix_extracts_resources(sample_pbix_path: Path):
++    result = parse_pbix(str(sample_pbix_path))
++    assert "logo.png" in result.resources
++    assert result.resources["logo.png"] == b"\x89PNG_FAKE_DATA"
++
++
++def test_parse_pbix_extracts_theme(sample_pbix_path: Path):
++    result = parse_pbix(str(sample_pbix_path))
++    assert result.theme is not None
++    assert result.theme["name"] == "CustomTheme"
++
++
++def test_parse_pbix_invalid_file(tmp_path: Path):
++    bad_path = tmp_path / "bad.pbix"
++    bad_path.write_text("not a zip file")
++    with pytest.raises(Exception, match="not a valid .pbix"):
++        parse_pbix(str(bad_path))

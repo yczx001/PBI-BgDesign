@@ -1,0 +1,929 @@
+141f5fb feat: add layout analyzer with overlap detection and element classification
+
+ .superpowers/sdd/progress.md        |   2 +-
+ .superpowers/sdd/task-1-diff.txt    | 499 ++++++++++++++++++++++++++++++++++++
+ .superpowers/sdd/task-1-report.md   |  56 ++++
+ .superpowers/sdd/task-1-review.md   |  54 ++++
+ src/pbi_bgdesign/layout_analyzer.py | 161 ++++++++++++
+ tests/test_layout_analyzer.py       |  99 +++++++
+ 6 files changed, 870 insertions(+), 1 deletion(-)
+---FULL DIFF---
+diff --git a/.superpowers/sdd/progress.md b/.superpowers/sdd/progress.md
+index 63e18dc..ebdaeed 100644
+--- a/.superpowers/sdd/progress.md
++++ b/.superpowers/sdd/progress.md
+@@ -1,14 +1,14 @@
+ # PBI-BgDesign Implementation Progress
+ 
+ ## Tasks
+-- Task 1: Project Setup + PBIX Parser — PENDING
++- Task 1: Project Setup + PBIX Parser — COMPLETE (ba85f1b..ba89b99, review APPROVED)
+ - Task 2: Layout Analyzer — PENDING
+ - Task 3: Mock Chart Renderer — PENDING
+ - Task 4: SVG Parser + Exporter — PENDING
+ - Task 5: Scene Renderer — PENDING
+ - Task 6: Skill Loader — PENDING
+ - Task 7: AI Designer — PENDING
+ - Task 8: MCP Client — PENDING
+ - Task 9: Main Window + Canvas + Page List — PENDING
+ - Task 10: Fullscreen Preview — PENDING
+ - Task 11: Power BI External Tool Registration — PENDING
+diff --git a/.superpowers/sdd/task-1-diff.txt b/.superpowers/sdd/task-1-diff.txt
+new file mode 100644
+index 0000000..4e77e3e
+--- /dev/null
++++ b/.superpowers/sdd/task-1-diff.txt
+@@ -0,0 +1,499 @@
++ba89b99 feat: add PBIX parser with UTF-16-LE layout decoding and resource extraction
++ .gitignore                             |   7 ++
++ .superpowers/sdd/extract_task.py       |  18 ++++
++ .superpowers/sdd/progress.md           |  15 ++++
++ pyproject.toml                         |  28 ++++++
++ src/pbi_bgdesign/__init__.py           |   0
++ src/pbi_bgdesign/ai/__init__.py        |   0
++ src/pbi_bgdesign/core/__init__.py      |   0
++ src/pbi_bgdesign/export/__init__.py    |   0
++ src/pbi_bgdesign/models.py             |  43 +++++++++
++ src/pbi_bgdesign/pbix_parser.py        | 154 +++++++++++++++++++++++++++++++++
++ src/pbi_bgdesign/rendering/__init__.py |   0
++ src/pbi_bgdesign/ui/__init__.py        |   0
++ tests/__init__.py                      |   0
++ tests/test_pbix_parser.py              | 154 +++++++++++++++++++++++++++++++++
++ 14 files changed, 419 insertions(+)
++---FULL DIFF---
++diff --git a/.gitignore b/.gitignore
++new file mode 100644
++index 0000000..3ea8582
++--- /dev/null
+++++ b/.gitignore
++@@ -0,0 +1,7 @@
+++__pycache__/
+++*.py[cod]
+++*.egg-info/
+++dist/
+++build/
+++.pytest_cache/
+++.temp_claude/
++diff --git a/.superpowers/sdd/extract_task.py b/.superpowers/sdd/extract_task.py
++new file mode 100644
++index 0000000..5aabac9
++--- /dev/null
+++++ b/.superpowers/sdd/extract_task.py
++@@ -0,0 +1,18 @@
+++"""Extract a task from the plan file."""
+++import sys
+++import re
+++
+++plan_path = sys.argv[1]
+++task_num = int(sys.argv[2])
+++
+++with open(plan_path, "r", encoding="utf-8") as f:
+++    content = f.read()
+++
+++# Split by task headers
+++tasks = re.split(r'(?=### Task \d+:)', content)
+++for t in tasks:
+++    match = re.match(r'### Task (\d+):', t)
+++    if match and int(match.group(1)) == task_num:
+++        # Find end (next task or end)
+++        print(t.strip())
+++        break
++diff --git a/.superpowers/sdd/progress.md b/.superpowers/sdd/progress.md
++new file mode 100644
++index 0000000..63e18dc
++--- /dev/null
+++++ b/.superpowers/sdd/progress.md
++@@ -0,0 +1,15 @@
+++# PBI-BgDesign Implementation Progress
+++
+++## Tasks
+++- Task 1: Project Setup + PBIX Parser — PENDING
+++- Task 2: Layout Analyzer — PENDING
+++- Task 3: Mock Chart Renderer — PENDING
+++- Task 4: SVG Parser + Exporter — PENDING
+++- Task 5: Scene Renderer — PENDING
+++- Task 6: Skill Loader — PENDING
+++- Task 7: AI Designer — PENDING
+++- Task 8: MCP Client — PENDING
+++- Task 9: Main Window + Canvas + Page List — PENDING
+++- Task 10: Fullscreen Preview — PENDING
+++- Task 11: Power BI External Tool Registration — PENDING
+++- Task 12: Integration + Cleanup — PENDING
++diff --git a/pyproject.toml b/pyproject.toml
++new file mode 100644
++index 0000000..005fc36
++--- /dev/null
+++++ b/pyproject.toml
++@@ -0,0 +1,28 @@
+++[build-system]
+++requires = ["setuptools>=68.0", "wheel"]
+++build-backend = "setuptools.build_meta"
+++
+++[project]
+++name = "pbi-bgdesign"
+++version = "0.1.0"
+++description = "Power BI Background Designer"
+++requires-python = ">=3.11"
+++dependencies = [
+++    "PyQt6>=6.6",
+++    "anthropic>=0.40",
+++    "mcp>=1.0",
+++    "watchdog>=3.0",
+++]
+++
+++[project.optional-dependencies]
+++dev = ["pytest>=7.0", "pytest-qt>=4.0"]
+++
+++[project.scripts]
+++pbi-bgdesign = "pbi_bgdesign.app:main"
+++
+++[tool.setuptools.packages.find]
+++where = ["src"]
+++
+++[tool.pytest.ini_options]
+++testpaths = ["tests"]
+++pythonpath = ["src"]
++diff --git a/src/pbi_bgdesign/__init__.py b/src/pbi_bgdesign/__init__.py
++new file mode 100644
++index 0000000..e69de29
++diff --git a/src/pbi_bgdesign/ai/__init__.py b/src/pbi_bgdesign/ai/__init__.py
++new file mode 100644
++index 0000000..e69de29
++diff --git a/src/pbi_bgdesign/core/__init__.py b/src/pbi_bgdesign/core/__init__.py
++new file mode 100644
++index 0000000..e69de29
++diff --git a/src/pbi_bgdesign/export/__init__.py b/src/pbi_bgdesign/export/__init__.py
++new file mode 100644
++index 0000000..e69de29
++diff --git a/src/pbi_bgdesign/models.py b/src/pbi_bgdesign/models.py
++new file mode 100644
++index 0000000..507591c
++--- /dev/null
+++++ b/src/pbi_bgdesign/models.py
++@@ -0,0 +1,43 @@
+++from dataclasses import dataclass, field
+++
+++
+++@dataclass
+++class VisualObject:
+++    """A single visual object extracted from a .pbix layout."""
+++    id: str
+++    visual_type: str  # "shape", "image", "textbox", "donutChart", etc.
+++    x: float
+++    y: float
+++    z: int
+++    width: float
+++    height: float
+++    title: str | None = None
+++    config: dict = field(default_factory=dict)
+++    resource_path: str | None = None
+++
+++    @property
+++    def bbox(self) -> tuple[float, float, float, float]:
+++        return (self.x, self.y, self.width, self.height)
+++
+++    @property
+++    def area(self) -> float:
+++        return self.width * self.height
+++
+++
+++@dataclass
+++class PageData:
+++    """A single report page with its visual objects."""
+++    name: str
+++    display_name: str
+++    width: float
+++    height: float
+++    visuals: list[VisualObject] = field(default_factory=list)
+++
+++
+++@dataclass
+++class PbixData:
+++    """Complete parsed .pbix data."""
+++    pages: list[PageData] = field(default_factory=list)
+++    resources: dict[str, bytes] = field(default_factory=dict)
+++    theme: dict | None = None
+++    source_path: str = ""
++diff --git a/src/pbi_bgdesign/pbix_parser.py b/src/pbi_bgdesign/pbix_parser.py
++new file mode 100644
++index 0000000..4add029
++--- /dev/null
+++++ b/src/pbi_bgdesign/pbix_parser.py
++@@ -0,0 +1,154 @@
+++"""Parser for .pbix files (Power BI reports)."""
+++import json
+++import zipfile
+++from pathlib import Path
+++
+++from pbi_bgdesign.models import PbixData, PageData, VisualObject
+++
+++
+++def _decode_layout(raw: bytes) -> dict:
+++    """Decode Layout JSON from UTF-16-LE bytes."""
+++    text = raw.decode("utf-16-le")
+++    return json.loads(text)
+++
+++
+++def _extract_title(config: dict) -> str | None:
+++    """Extract chart title from visual config objects."""
+++    try:
+++        objects = config.get("singleVisual", {}).get("objects", {})
+++        title_list = objects.get("title", [])
+++        if title_list:
+++            props = title_list[0].get("properties", {})
+++            text_expr = props.get("text", {}).get("expr", {})
+++            literal = text_expr.get("Literal", {})
+++            value = literal.get("Value", "")
+++            # Remove surrounding quotes
+++            return value.strip("'\"") if value else None
+++    except (KeyError, IndexError, TypeError):
+++        pass
+++    return None
+++
+++
+++def _extract_resource_path(config: dict) -> str | None:
+++    """Extract image resource path from visual config."""
+++    try:
+++        objects = config.get("singleVisual", {}).get("objects", {})
+++        general = objects.get("general", [])
+++        if general:
+++            props = general[0].get("properties", {})
+++            image_url = props.get("imageUrl", {}).get("expr", {})
+++            rpi = image_url.get("ResourcePackageItem", {})
+++            return rpi.get("ItemName")
+++    except (KeyError, IndexError, TypeError):
+++        pass
+++    return None
+++
+++
+++def _parse_visual(vc: dict, index: int) -> VisualObject:
+++    """Parse a single visualContainer dict into a VisualObject."""
+++    config_str = vc.get("config", "{}")
+++    try:
+++        config = json.loads(config_str)
+++    except json.JSONDecodeError:
+++        config = {}
+++
+++    visual_type = config.get("singleVisual", {}).get("visualType", "unknown")
+++    title = _extract_title(config)
+++    resource_path = _extract_resource_path(config)
+++
+++    # Generate a stable ID from config name or fallback to index
+++    obj_name = config.get("name", f"visual_{index}")
+++
+++    return VisualObject(
+++        id=obj_name,
+++        visual_type=visual_type,
+++        x=float(vc.get("x", 0)),
+++        y=float(vc.get("y", 0)),
+++        z=int(vc.get("z", 0)),
+++        width=float(vc.get("width", 0)),
+++        height=float(vc.get("height", 0)),
+++        title=title,
+++        config=config,
+++        resource_path=resource_path,
+++    )
+++
+++
+++def _parse_page(section: dict) -> PageData:
+++    """Parse a section dict into a PageData."""
+++    visuals = []
+++    for i, vc in enumerate(section.get("visualContainers", [])):
+++        visuals.append(_parse_visual(vc, i))
+++
+++    return PageData(
+++        name=section.get("name", ""),
+++        display_name=section.get("displayName", ""),
+++        width=float(section.get("width", 1280)),
+++        height=float(section.get("height", 720)),
+++        visuals=visuals,
+++    )
+++
+++
+++def _extract_resources(zf: zipfile.ZipFile) -> dict[str, bytes]:
+++    """Extract static resources from the ZIP."""
+++    resources = {}
+++    prefix = "Report/StaticResources/RegisteredResources/"
+++    for entry in zf.namelist():
+++        if entry.startswith(prefix):
+++            filename = entry[len(prefix):]
+++            if filename:  # skip directory entries
+++                resources[filename] = zf.read(entry)
+++    return resources
+++
+++
+++def _extract_theme(zf: zipfile.ZipFile) -> dict | None:
+++    """Extract theme JSON if present."""
+++    prefix = "Report/StaticResources/SharedResources/BaseThemes/"
+++    for entry in zf.namelist():
+++        if entry.startswith(prefix) and entry.endswith(".json"):
+++            try:
+++                return json.loads(zf.read(entry))
+++            except json.JSONDecodeError:
+++                return None
+++    return None
+++
+++
+++def parse_pbix(path: str) -> PbixData:
+++    """Parse a .pbix file and return structured data.
+++
+++    Args:
+++        path: Path to the .pbix file.
+++
+++    Returns:
+++        PbixData with pages, resources, and theme.
+++
+++    Raises:
+++        Exception: If the file is not a valid .pbix (ZIP) file.
+++    """
+++    try:
+++        with zipfile.ZipFile(path, "r") as zf:
+++            # Parse Layout
+++            if "Report/Layout" not in zf.namelist():
+++                raise ValueError("not a valid .pbix file: missing Report/Layout")
+++
+++            layout_raw = zf.read("Report/Layout")
+++            layout = _decode_layout(layout_raw)
+++
+++            # Parse pages
+++            pages = []
+++            for section in layout.get("sections", []):
+++                pages.append(_parse_page(section))
+++
+++            # Extract resources
+++            resources = _extract_resources(zf)
+++
+++            # Extract theme
+++            theme = _extract_theme(zf)
+++
+++            return PbixData(
+++                pages=pages,
+++                resources=resources,
+++                theme=theme,
+++                source_path=path,
+++            )
+++    except zipfile.BadZipFile:
+++        raise ValueError(f"not a valid .pbix file: {path}")
++diff --git a/src/pbi_bgdesign/rendering/__init__.py b/src/pbi_bgdesign/rendering/__init__.py
++new file mode 100644
++index 0000000..e69de29
++diff --git a/src/pbi_bgdesign/ui/__init__.py b/src/pbi_bgdesign/ui/__init__.py
++new file mode 100644
++index 0000000..e69de29
++diff --git a/tests/__init__.py b/tests/__init__.py
++new file mode 100644
++index 0000000..e69de29
++diff --git a/tests/test_pbix_parser.py b/tests/test_pbix_parser.py
++new file mode 100644
++index 0000000..82849c3
++--- /dev/null
+++++ b/tests/test_pbix_parser.py
++@@ -0,0 +1,154 @@
+++import json
+++import zipfile
+++import io
+++from pathlib import Path
+++
+++import pytest
+++
+++from pbi_bgdesign.pbix_parser import parse_pbix
+++from pbi_bgdesign.models import PbixData, PageData, VisualObject
+++
+++
+++@pytest.fixture
+++def sample_pbix_path(tmp_path: Path) -> Path:
+++    """Create a minimal .pbix file for testing."""
+++    layout = {
+++        "sections": [
+++            {
+++                "name": "page1_id",
+++                "displayName": "Home",
+++                "width": 1280,
+++                "height": 720,
+++                "displayOption": 1,
+++                "visualContainers": [
+++                    {
+++                        "x": 100.0,
+++                        "y": 50.0,
+++                        "z": 1000,
+++                        "width": 300.0,
+++                        "height": 200.0,
+++                        "config": json.dumps({
+++                            "name": "visual1",
+++                            "singleVisual": {
+++                                "visualType": "donutChart",
+++                                "objects": {
+++                                    "title": [{"properties": {"text": {"expr": {"Literal": {"Value": "'Sales Distribution'"}}}}}]
+++                                }
+++                            }
+++                        })
+++                    },
+++                    {
+++                        "x": 0.0,
+++                        "y": 0.0,
+++                        "z": 500,
+++                        "width": 1280.0,
+++                        "height": 60.0,
+++                        "config": json.dumps({
+++                            "name": "visual2",
+++                            "singleVisual": {
+++                                "visualType": "shape",
+++                                "objects": {}
+++                            }
+++                        })
+++                    },
+++                    {
+++                        "x": 1075.0,
+++                        "y": 7.0,
+++                        "z": 2000,
+++                        "width": 177.0,
+++                        "height": 46.0,
+++                        "config": json.dumps({
+++                            "name": "visual3",
+++                            "singleVisual": {
+++                                "visualType": "image",
+++                                "objects": {
+++                                    "general": [{"properties": {
+++                                        "imageUrl": {"expr": {"ResourcePackageItem": {
+++                                            "PackageName": "RegisteredResources",
+++                                            "ItemName": "logo.png"
+++                                        }}}
+++                                    }}]
+++                                }
+++                            }
+++                        })
+++                    }
+++                ]
+++            },
+++            {
+++                "name": "page2_id",
+++                "displayName": "Detail",
+++                "width": 1920,
+++                "height": 1080,
+++                "displayOption": 1,
+++                "visualContainers": []
+++            }
+++        ]
+++    }
+++
+++    pbix_path = tmp_path / "test.pbix"
+++    with zipfile.ZipFile(pbix_path, "w") as zf:
+++        # Layout is UTF-16-LE encoded
+++        layout_json = json.dumps(layout, ensure_ascii=False)
+++        layout_bytes = layout_json.encode("utf-16-le")
+++        zf.writestr("Report/Layout", layout_bytes)
+++        # Add a resource file
+++        zf.writestr("Report/StaticResources/RegisteredResources/logo.png", b"\x89PNG_FAKE_DATA")
+++        # Add theme
+++        zf.writestr("Report/StaticResources/SharedResources/BaseThemes/theme.json",
+++                     json.dumps({"name": "CustomTheme"}))
+++    return pbix_path
+++
+++
+++def test_parse_pbix_returns_pbix_data(sample_pbix_path: Path):
+++    result = parse_pbix(str(sample_pbix_path))
+++    assert isinstance(result, PbixData)
+++    assert result.source_path == str(sample_pbix_path)
+++
+++
+++def test_parse_pbix_extracts_pages(sample_pbix_path: Path):
+++    result = parse_pbix(str(sample_pbix_path))
+++    assert len(result.pages) == 2
+++    assert result.pages[0].display_name == "Home"
+++    assert result.pages[0].width == 1280
+++    assert result.pages[0].height == 720
+++    assert result.pages[1].display_name == "Detail"
+++    assert result.pages[1].width == 1920
+++
+++
+++def test_parse_pbix_extracts_visuals(sample_pbix_path: Path):
+++    result = parse_pbix(str(sample_pbix_path))
+++    page = result.pages[0]
+++    assert len(page.visuals) == 3
+++
+++    donut = page.visuals[0]
+++    assert donut.visual_type == "donutChart"
+++    assert donut.x == 100.0
+++    assert donut.y == 50.0
+++    assert donut.width == 300.0
+++    assert donut.title == "Sales Distribution"
+++
+++    shape = page.visuals[1]
+++    assert shape.visual_type == "shape"
+++
+++    image = page.visuals[2]
+++    assert image.visual_type == "image"
+++    assert image.resource_path == "logo.png"
+++
+++
+++def test_parse_pbix_extracts_resources(sample_pbix_path: Path):
+++    result = parse_pbix(str(sample_pbix_path))
+++    assert "logo.png" in result.resources
+++    assert result.resources["logo.png"] == b"\x89PNG_FAKE_DATA"
+++
+++
+++def test_parse_pbix_extracts_theme(sample_pbix_path: Path):
+++    result = parse_pbix(str(sample_pbix_path))
+++    assert result.theme is not None
+++    assert result.theme["name"] == "CustomTheme"
+++
+++
+++def test_parse_pbix_invalid_file(tmp_path: Path):
+++    bad_path = tmp_path / "bad.pbix"
+++    bad_path.write_text("not a zip file")
+++    with pytest.raises(Exception, match="not a valid .pbix"):
+++        parse_pbix(str(bad_path))
+diff --git a/.superpowers/sdd/task-1-report.md b/.superpowers/sdd/task-1-report.md
+new file mode 100644
+index 0000000..499347b
+--- /dev/null
++++ b/.superpowers/sdd/task-1-report.md
+@@ -0,0 +1,56 @@
++# Task 1 Report: Project Setup + PBIX Parser
++
++**Status:** DONE
++
++## Summary
++
++Task 1 completed successfully. All project scaffolding created, PBIX parser implemented and tested, real .pbix file parsed correctly.
++
++## Files Created (14 files)
++
++- `pyproject.toml` — project config (build backend changed from plan's `setuptools.backends._legacy:_Backend` to `setuptools.build_meta` for compatibility)
++- `src/pbi_bgdesign/__init__.py` — empty
++- `src/pbi_bgdesign/core/__init__.py` — empty
++- `src/pbi_bgdesign/rendering/__init__.py` — empty
++- `src/pbi_bgdesign/export/__init__.py` — empty
++- `src/pbi_bgdesign/ai/__init__.py` — empty
++- `src/pbi_bgdesign/ui/__init__.py` — empty
++- `tests/__init__.py` — empty
++- `src/pbi_bgdesign/models.py` — dataclasses (VisualObject, PageData, PbixData)
++- `src/pbi_bgdesign/pbix_parser.py` — parser implementation
++- `tests/test_pbix_parser.py` — 6 test functions
++- `.gitignore` — exclude __pycache__, .egg-info, .pytest_cache, etc.
++
++## Test Results
++
++```
++tests/test_pbix_parser.py::test_parse_pbix_returns_pbix_data PASSED
++tests/test_pbix_parser.py::test_parse_pbix_extracts_pages PASSED
++tests/test_pbix_parser.py::test_parse_pbix_extracts_visuals PASSED
++tests/test_pbix_parser.py::test_parse_pbix_extracts_resources PASSED
++tests/test_pbix_parser.py::test_parse_pbix_extracts_theme PASSED
++tests/test_pbix_parser.py::test_parse_pbix_invalid_file PASSED
++
++6 passed in 0.17s
++```
++
++## Real .pbix File Test
++
++Successfully parsed `天津工厂新需求_V2.1 .pbix`:
++- **17 pages** extracted with correct visual counts and dimensions
++- **4 resources** extracted: 2 PNG images, 1 JSON config, 1 SVG
++- **Theme** extracted: "Fluent 2 (Preview)" with full color palette
++
++## Commits
++
++- `ba89b99` — `feat: add PBIX parser with UTF-16-LE layout decoding and resource extraction`
++
++## Concerns / Deviations
++
++1. **build-backend changed**: Plan specified `setuptools.backends._legacy:_Backend` but this caused `ModuleNotFoundError: No module named 'setuptools.backends'` with the available setuptools version. Changed to standard `setuptools.build_meta`.
++
++2. **Python environment**: The system has Anaconda3 Python 3.12.7 at `C:\ProgramData\anaconda3\python.exe`. The WindowsApps python.exe is a stub that doesn't work. `pip` command is not on PATH directly; must use `python -m pip`.
++
++3. **pytest-qt DLL issue**: pytest-qt 4.5.0 fails to load with `ImportError: DLL load failed while importing QtCore` — likely missing Qt platform plugins. Uninstalled pytest-qt for now; parser tests don't need Qt. Will need to resolve for later tasks that test Qt components.
++
++4. **Scripts installed to user site**: pip installed scripts to `C:\Users\rages\AppData\Roaming\Python\Python312\Scripts` (not on PATH). Not a blocker for testing.
+diff --git a/.superpowers/sdd/task-1-review.md b/.superpowers/sdd/task-1-review.md
+new file mode 100644
+index 0000000..9ba5783
+--- /dev/null
++++ b/.superpowers/sdd/task-1-review.md
+@@ -0,0 +1,54 @@
++# Task 1 Review
++
++## Spec Compliance
++✅ **Fully compliant** — All Task 1 requirements are implemented correctly.
++
++### Checklist:
++- [x] `pyproject.toml` created with correct structure (build-backend deviation is justified, see below)
++- [x] All `__init__.py` files created: `src/pbi_bgdesign/`, `core/`, `rendering/`, `export/`, `ai/`, `ui/`, `tests/`
++- [x] `models.py` — `VisualObject`, `PageData`, `PbixData` dataclasses match spec exactly (all fields, types, defaults, properties)
++- [x] `pbix_parser.py` — All 8 functions present: `_decode_layout`, `_extract_title`, `_extract_resource_path`, `_parse_visual`, `_parse_page`, `_extract_resources`, `_extract_theme`, `parse_pbix`
++- [x] UTF-16-LE decoding implemented correctly (`raw.decode("utf-16-le")`)
++- [x] Title extraction handles `Literal.Value` with quote stripping
++- [x] Resource path extraction handles `ResourcePackageItem.ItemName`
++- [x] Resource extraction from `Report/StaticResources/RegisteredResources/`
++- [x] Theme extraction from `Report/StaticResources/SharedResources/BaseThemes/*.json`
++- [x] All 6 tests present and matching spec exactly
++- [x] Error handling: `ValueError("not a valid .pbix file: ...")` for both bad ZIP and missing Layout
++- [x] `.gitignore` added (bonus, not in spec but useful)
++- [x] All 6 tests pass (verified by implementer report)
++- [x] Real .pbix file parsed successfully (17 pages, 4 resources, theme extracted)
++
++## Code Quality
++**Approved** — Clean, well-organized code following good practices.
++
++- Clear separation of concerns: each private function handles one extraction task
++- Defensive coding: `try/except` blocks in `_extract_title` and `_extract_resource_path` handle unexpected data gracefully
++- JSON parse errors in visual config are caught and defaulted to `{}`
++- Type hints used throughout
++- Docstrings on all public and private functions
++- DRY: helper functions avoid duplication between title/resource extraction
++- No unnecessary abstractions (YAGNI)
++
++## Findings
++
++- [Minor] **Unused import `io`** in `tests/test_pbix_parser.py` line 3 — imported but never used. Cosmetic issue, no functional impact. (Matches spec code exactly, so this was inherited from the plan.)
++
++- [Minor] **Unused import `Path`** in `src/pbi_bgdesign/pbix_parser.py` line 4 — `pathlib.Path` is imported but no function uses it (all path handling uses `str`). Again inherited from spec.
++
++- [Minor] **`build-backend` deviation** — Plan specified `setuptools.backends._legacy:_Backend`, changed to `setuptools.build_meta`. This is the correct fix: the original value is a non-standard path that causes `ModuleNotFoundError`. `setuptools.build_meta` is the standard PEP 517 build backend. **Acceptable deviation.**
++
++- [Minor] **`pytest-qt` DLL issue** noted in report — not a Task 1 blocker (parser tests don't need Qt), but will need resolution before Task 3/5/9 which test Qt components.
++
++## Deviations Assessment
++
++| Deviation | Assessment |
++|---|---|
++| `build-backend` → `setuptools.build_meta` | ✅ Justified — original value doesn't work |
++| `pytest-qt` uninstalled | ✅ Acceptable for Task 1 — not needed for parser tests |
++
++## Verdict
++
++**APPROVED**
++
++Task 1 is fully implemented according to spec. All 6 tests pass, the parser correctly handles UTF-16-LE layout decoding, extracts pages/visuals/resources/theme, and handles error cases. The two deviations are both justified. The minor findings (unused imports) are inherited from the spec itself and have zero functional impact. Ready to proceed to Task 2.
+diff --git a/src/pbi_bgdesign/layout_analyzer.py b/src/pbi_bgdesign/layout_analyzer.py
+new file mode 100644
+index 0000000..932d83b
+--- /dev/null
++++ b/src/pbi_bgdesign/layout_analyzer.py
+@@ -0,0 +1,161 @@
++"""Analyze visual object layouts: overlap detection, classification, summary generation."""
++from dataclasses import dataclass, field
++
++from pbi_bgdesign.models import VisualObject, PageData
++
++
++# Element classification rules
++CHART_TYPES = {
++    "donutChart", "pieChart", "lineChart", "barChart", "clusteredBarChart",
++    "columnChart", "clusteredColumnChart", "hundredPercentStackedBarChart",
++    "hundredPercentStackedColumnChart", "lineClusteredColumnComboChart",
++    "lineStackedColumnComboChart", "tableEx", "pivotTable", "cardVisual",
++    "multiRowCard", "slicer", "advancedSlicerVisual", "scatterChart",
++    "waterfallChart", "funnel", "gauge", "treemap", "map", "filledMap",
++    "ribbonChart", "areaChart", "decodedRibbonChart",
++}
++# Also match custom visual type prefixes
++CHART_PREFIXES = ("Gantt", "powerGANTT", "ScrollingText", "htmlContent", "synopticPanel")
++
++
++def classify_visual(visual_type: str) -> str:
++    """Classify a visual object type into a category.
++
++    Returns: 'decoration', 'text', 'chart', or 'interactive'
++    """
++    if visual_type in ("shape", "image"):
++        return "decoration"
++    if visual_type == "textbox":
++        return "text"
++    if visual_type == "actionButton":
++        return "interactive"
++    if visual_type in CHART_TYPES:
++        return "chart"
++    if any(visual_type.startswith(p) for p in CHART_PREFIXES):
++        return "chart"
++    # Unknown types treated as charts (conservative: don't export)
++    return "chart"
++
++
++@dataclass
++class OverlapGroup:
++    """A group of overlapping visual objects."""
++    id: str
++    visuals: list[VisualObject] = field(default_factory=list)
++
++    @property
++    def bbox(self) -> tuple[float, float, float, float]:
++        """Combined bounding box of all visuals in group."""
++        if not self.visuals:
++            return (0, 0, 0, 0)
++        min_x = min(v.x for v in self.visuals)
++        min_y = min(v.y for v in self.visuals)
++        max_x = max(v.x + v.width for v in self.visuals)
++        max_y = max(v.y + v.height for v in self.visuals)
++        return (min_x, min_y, max_x - min_x, max_y - min_y)
++
++
++@dataclass
++class LayoutAnalysis:
++    """Complete analysis of a page layout."""
++    page: PageData
++    groups: list[OverlapGroup] = field(default_factory=list)
++    classifications: dict[str, str] = field(default_factory=dict)  # visual_id -> category
++
++
++def _overlap_ratio(v1: VisualObject, v2: VisualObject) -> float:
++    """Calculate overlap ratio: intersection area / smaller visual area."""
++    ix = max(0, min(v1.x + v1.width, v2.x + v2.width) - max(v1.x, v2.x))
++    iy = max(0, min(v1.y + v1.height, v2.y + v2.height) - max(v1.y, v2.y))
++    intersection = ix * iy
++    smaller_area = min(v1.area, v2.area)
++    if smaller_area <= 0:
++        return 0.0
++    return intersection / smaller_area
++
++
++def detect_overlaps(visuals: list[VisualObject], threshold: float = 0.5) -> list[OverlapGroup]:
++    """Detect overlapping visual groups using union-find.
++
++    Two visuals are in the same group if their overlap ratio exceeds threshold.
++    """
++    n = len(visuals)
++    parent = list(range(n))
++
++    def find(x: int) -> int:
++        while parent[x] != x:
++            parent[x] = parent[parent[x]]
++            x = parent[x]
++        return x
++
++    def union(a: int, b: int):
++        ra, rb = find(a), find(b)
++        if ra != rb:
++            parent[ra] = rb
++
++    # Check all pairs
++    for i in range(n):
++        for j in range(i + 1, n):
++            if _overlap_ratio(visuals[i], visuals[j]) > threshold:
++                union(i, j)
++
++    # Group by root
++    groups_map: dict[int, list[VisualObject]] = {}
++    for i in range(n):
++        root = find(i)
++        groups_map.setdefault(root, []).append(visuals[i])
++
++    # Sort each group by z-order
++    groups = []
++    for idx, members in enumerate(groups_map.values()):
++        members.sort(key=lambda v: v.z)
++        groups.append(OverlapGroup(id=f"group_{idx}", visuals=members))
++
++    return groups
++
++
++def analyze_layout(page: PageData) -> LayoutAnalysis:
++    """Perform complete layout analysis on a page."""
++    groups = detect_overlaps(page.visuals)
++    classifications = {v.id: classify_visual(v.visual_type) for v in page.visuals}
++    return LayoutAnalysis(page=page, groups=groups, classifications=classifications)
++
++
++def generate_layout_summary(analysis: LayoutAnalysis, mode: str = "fixed") -> str:
++    """Generate a structured text summary of the layout for AI consumption.
++
++    Args:
++        analysis: The layout analysis result.
++        mode: Layout mode - 'fixed', 'flexible', or 'free'.
++    """
++    page = analysis.page
++    mode_names = {"fixed": "固定布局", "flexible": "弹性布局", "free": "自由设计"}
++    mode_desc = mode_names.get(mode, mode)
++
++    lines = [
++        f"## 页面: {page.display_name}",
++        f"画布尺寸: {page.width} x {page.height}",
++        f"布局模式: {mode_desc}",
++        "",
++        f"视觉对象总数: {len(page.visuals)}",
++        "",
++    ]
++
++    # Group info
++    lines.append("### 重叠分组:")
++    for g in analysis.groups:
++        if len(g.visuals) > 1:
++            names = [f"{v.id}({v.visual_type})" for v in g.visuals]
++            lines.append(f"  组 {g.id}: {', '.join(names)} — 合成组件")
++
++    lines.append("")
++    lines.append("### 视觉对象详情:")
++    for v in page.visuals:
++        cat = analysis.classifications.get(v.id, "unknown")
++        title_str = f', 标题="{v.title}"' if v.title else ""
++        lines.append(
++            f"  [{cat}] {v.id}: type={v.visual_type}, "
++            f"pos=({v.x:.0f},{v.y:.0f}), size={v.width:.0f}x{v.height:.0f}{title_str}"
++        )
++
++    return "\n".join(lines)
+diff --git a/tests/test_layout_analyzer.py b/tests/test_layout_analyzer.py
+new file mode 100644
+index 0000000..194c67e
+--- /dev/null
++++ b/tests/test_layout_analyzer.py
+@@ -0,0 +1,99 @@
++import pytest
++
++from pbi_bgdesign.models import VisualObject, PageData
++from pbi_bgdesign.layout_analyzer import (
++    classify_visual,
++    detect_overlaps,
++    analyze_layout,
++    generate_layout_summary,
++    OverlapGroup,
++    LayoutAnalysis,
++)
++
++
++def _make_visual(id: str, vtype: str, x: float, y: float, w: float, h: float, z: int = 0) -> VisualObject:
++    return VisualObject(id=id, visual_type=vtype, x=x, y=y, z=z, width=w, height=h)
++
++
++def test_classify_visual_shape():
++    assert classify_visual("shape") == "decoration"
++
++
++def test_classify_visual_image():
++    assert classify_visual("image") == "decoration"
++
++
++def test_classify_visual_textbox():
++    assert classify_visual("textbox") == "text"
++
++
++def test_classify_visual_chart():
++    assert classify_visual("donutChart") == "chart"
++    assert classify_visual("lineChart") == "chart"
++    assert classify_visual("tableEx") == "chart"
++    assert classify_visual("slicer") == "chart"
++
++
++def test_classify_visual_action_button():
++    assert classify_visual("actionButton") == "interactive"
++
++
++def test_detect_overlaps_no_overlap():
++    v1 = _make_visual("a", "shape", 0, 0, 100, 100)
++    v2 = _make_visual("b", "shape", 200, 200, 100, 100)
++    groups = detect_overlaps([v1, v2])
++    assert len(groups) == 2  # Each visual is its own group
++
++
++def test_detect_overlaps_full_overlap():
++    # v2 is completely inside v1
++    v1 = _make_visual("a", "donutChart", 0, 0, 300, 300)
++    v2 = _make_visual("b", "cardVisual", 50, 50, 100, 80)
++    groups = detect_overlaps([v1, v2])
++    assert len(groups) == 1
++    assert len(groups[0].visuals) == 2
++
++
++def test_detect_overlaps_transitive():
++    # A overlaps B, B overlaps C → all in one group (transitive)
++    # v1-v2 overlap: 80%, v2-v3 overlap: 60%, v1-v3 overlap: 40%
++    # So v1-v3 don't directly overlap enough, but both overlap with v2 > 50%
++    v1 = _make_visual("a", "shape", 0, 0, 100, 100)
++    v2 = _make_visual("b", "shape", 20, 0, 100, 100)
++    v3 = _make_visual("c", "shape", 60, 0, 100, 100)
++    groups = detect_overlaps([v1, v2, v3])
++    assert len(groups) == 1
++    assert len(groups[0].visuals) == 3
++
++
++def test_analyze_layout():
++    page = PageData(
++        name="p1", display_name="Home", width=1280, height=720,
++        visuals=[
++            _make_visual("v1", "donutChart", 100, 100, 300, 250),
++            _make_visual("v2", "cardVisual", 150, 120, 100, 80),  # overlaps v1
++            _make_visual("v3", "shape", 0, 0, 1280, 60),
++            _make_visual("v4", "textbox", 20, 10, 400, 40),
++        ]
++    )
++    result = analyze_layout(page)
++    assert isinstance(result, LayoutAnalysis)
++    assert len(result.groups) >= 2  # at least the overlap group + others
++    assert result.page == page
++
++
++def test_generate_layout_summary_contains_key_info():
++    page = PageData(
++        name="p1", display_name="Home", width=1280, height=720,
++        visuals=[
++            _make_visual("v1", "donutChart", 100, 100, 300, 250),
++            _make_visual("v2", "shape", 0, 0, 1280, 60),
++        ]
++    )
++    analysis = analyze_layout(page)
++    summary = generate_layout_summary(analysis, "fixed")
++    assert "1280" in summary
++    assert "720" in summary
++    assert "donutChart" in summary
++    assert "shape" in summary
++    assert "fixed" in summary.lower() or "固定" in summary
