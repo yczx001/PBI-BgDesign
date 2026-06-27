@@ -12,4 +12,4 @@
 - Task 9: Main Window + Canvas + Page List — COMPLETE (4d8ebcd..4df81e0, review APPROVED)
 - Task 10: Fullscreen Preview — COMPLETE (4df81e0..971fe68, review APPROVED after fix)
 - Task 11: Power BI External Tool Registration — COMPLETE (971fe68..4eff40e, verified)
-- Task 12: Integration + Cleanup — PENDING
+- Task 12: Integration + Cleanup — COMPLETE (4eff40e..c8aa15b, 48/48 tests pass)

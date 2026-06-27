@@ -8,3 +8,4 @@ build/
 *.egg
 .env
 .temp_claude/
+.superpowers/

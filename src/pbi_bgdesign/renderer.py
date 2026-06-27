@@ -4,7 +4,7 @@ from PyQt6.QtCore import QRectF, QSize
 from PyQt6.QtGui import QColor, QImage, QFont, QPixmap
 
 from pbi_bgdesign.models import VisualObject
-from pbi_bgdesign.layout_analyzer import LayoutAnalysis, classify_visual
+from pbi_bgdesign.layout_analyzer import LayoutAnalysis
 from pbi_bgdesign.mock_renderer import render_mock_chart
 from pbi_bgdesign.svg_design import parse_svg_to_items
 

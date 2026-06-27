@@ -59,13 +59,6 @@ class ObjectListWidget(QWidget):
         self.tree.blockSignals(True)
         self.tree.clear()
 
-        # Group visuals by overlap group
-        visual_to_group = {}
-        for g in analysis.groups:
-            if len(g.visuals) > 1:
-                for v in g.visuals:
-                    visual_to_group[v.id] = g
-
         added = set()
         for g in analysis.groups:
             if len(g.visuals) > 1:

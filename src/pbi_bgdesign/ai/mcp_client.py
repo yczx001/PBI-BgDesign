@@ -28,7 +28,13 @@ class MCPClientManager:
         return "stdio"
 
     async def connect_all(self, config: dict):
-        """Connect to all configured MCP servers."""
+        """Connect to all configured MCP servers.
+
+        This is a placeholder implementation. The actual MCP SDK integration
+        (using mcp Python package) is a future task. Currently it only stores
+        the server configurations and infers transport types without establishing
+        real connections.
+        """
         servers = config.get("mcpServers", {})
         for name, server_config in servers.items():
             transport = self._infer_transport(server_config)
@@ -52,7 +58,12 @@ class MCPClientManager:
         return self._tools
 
     async def call_tool(self, server_name: str, tool_name: str, arguments: dict) -> str:
-        """Call a tool on a specific MCP server."""
+        """Call a tool on a specific MCP server.
+
+        This is a placeholder implementation. The actual MCP SDK tool invocation
+        is a future task. Currently returns a descriptive string without executing
+        any real tool call.
+        """
         if server_name not in self.connected_servers:
             return f"Server '{server_name}' not connected."
         # MCP SDK tool call would go here

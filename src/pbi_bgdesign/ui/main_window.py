@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QFileDialog, QToolBar, QStatusBar,
     QLineEdit, QTextEdit, QGroupBox,
 )
-from PyQt6.QtCore import Qt, QThread, QSize
+from PyQt6.QtCore import Qt, QSize
 
 from pbi_bgdesign.pbix_parser import parse_pbix
 from pbi_bgdesign.layout_analyzer import analyze_layout

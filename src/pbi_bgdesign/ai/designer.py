@@ -6,7 +6,6 @@ import anthropic
 
 from pbi_bgdesign.ai.skills import SkillLoader
 from pbi_bgdesign.layout_analyzer import LayoutAnalysis, generate_layout_summary
-from pbi_bgdesign.models import VisualObject
 
 SUPPORTED_VISION_MODELS = {
     "claude-sonnet-4-6",
@@ -241,9 +240,11 @@ class AIDesigner(QObject):
             return "No skills available."
 
         elif name == "add_text_element":
+            # Stub: to be implemented when UI integration is complete
             return f"Text element added: '{input_data.get('text', '')}' at ({input_data.get('x', 0)}, {input_data.get('y', 0)})"
 
         elif name == "highlight_visual":
+            # Stub: to be implemented when UI integration is complete
             return f"Highlighted visual: {input_data.get('visual_id', '')}"
 
         return f"Unknown tool: {name}"
@@ -290,7 +291,6 @@ class AIDesigner(QObject):
                     messages=self.conversation,
                     tools=tools,
                 ) as stream:
-                    assistant_content = []
                     for event in stream:
                         # Handle text delta
                         if hasattr(event, 'type'):
