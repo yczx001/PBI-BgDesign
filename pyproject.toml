@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pbi-bgdesign"
+version = "0.1.0"
+description = "Power BI Background Designer"
+requires-python = ">=3.11"
+dependencies = [
+    "PyQt6>=6.6",
+    "anthropic>=0.40",
+    "mcp>=1.0",
+    "watchdog>=3.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-qt>=4.0"]
+
+[project.scripts]
+pbi-bgdesign = "pbi_bgdesign.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
